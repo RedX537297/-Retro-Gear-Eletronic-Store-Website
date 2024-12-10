@@ -1,27 +1,77 @@
-/**
- * app.js
- * DO NOT ALTER THIS CODE
- */
+require('dotenv').config();
+
 const express = require('express');
+
 const app = express();
-const port = process.env.PORT || 3000; // Define the port to listen on
 
-// Middleware for parsing request bodies as JSON
+const port = 3000;
+
+const mysql = require('mysql2');
+
+const bcrypt = require('bcrypt');
+
+const session = require('express-session');
+
+const path = require('path');
+
+app.use(express.urlencoded({ extended: true }));
+
 app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
 
-// Set the view engine to EJS
 app.set('view engine', 'ejs');
 
-// Serve static files (e.g., stylesheets)
-app.use(express.static(__dirname + '/public'));
+app.set('views', path.join(__dirname, 'views'));
 
-// Import and use the books router
-const deviceRouter = require('./routes/devices');
-app.use('/', deviceRouter);
+app.use(session({
 
-// Start the server
+    secret: process.env.SECRET,
+
+    resave: false,
+
+    saveUninitialized: true
+
+  }));
+
+const router = require('./routes/users');
+
+app.use('/', router);
+
 app.listen(port, () => {
-  console.log(`App started and running on port ${port}`);
-});
 
+    console.log(`Server is running on port ${process.env.PORT}`);
+
+  });
+
+  function logout() {
+
+    fetch('/api/logout', {
+
+        method: 'POST'
+
+    })
+
+    .then(response => {
+
+        if (response.ok) {
+
+            // Redirect to login page
+
+            window.location.href = '/login';
+
+        } else {
+
+            // Handle error
+
+            console.error('Logout failed');
+
+        }
+
+    });
+
+}
+
+
+
+// Attach logout function to the "Logout" button click event
+
+document.getElementById('logoutButton').addEventListener('click', logout); 

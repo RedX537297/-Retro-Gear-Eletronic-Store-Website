@@ -1,67 +1,106 @@
+const bcrypt = require('bcrypt');
 const express = require('express');
 const router = express.Router();
-const Device = require('../models/Device');
+const db = require('../database');
 
-router.get('/devices', async (req, res) => {
-    try {
-        const devices = await Device.getAllDevices();
-        res.render('devices', {devices});
-    }catch (err) {
-        console.error('Error fetching devices: ' + err.message);
-        res.status(500).json({error: 'Failed to fetch devices'});
+router.get('/register',(req,res)=>{
+    res.render('registration');
+});
+
+router.get('/login',(req,res)=>{
+    res.render('login');
+});
+
+router.get('/logout',(req,res)=>{
+    res.render('logout');
+});
+
+router.get('/show-devices',(req,res)=>{
+    if(req.session.user){
+        //user is authenticated
+
+        const user = req.session.user;
+
+        res.render('show-devices',{user});
+    }
+    else {
+        res.redirect('/login');
     }
 });
 
-router.get('/devices/new', (req, res) => {
-    res.render('add-device');
+router.post('/register',(req,res)=>{
+    const {user,password} = req.body;
+
+    bcrypt.hash(password,10,(err,hash)=>{
+        if(err){
+            console.log("Password hashing error: ",err);
+            return res.redirect('/register');
+        }
+        res.redirect('/login');
+        const insertQuery = "INSERT INTO user (username,password) VALUES (?,?)"
+        db.query(insertQuery,[user,hash],(err,result)=>{
+            console.error("Database insert error: ",err);
+            res.redirect('/register');
+        });
+    });
 });
 
-router.post('/devices', async (req, res) => {
-    const {id, device_name, brand, price} = req.body;
-    const newDevice = new Device(id, device_name, brand, price);
+router.post('/login',(req,res)=>{
+    const {username,password} = req.body;
 
-    try {
-        await newDevice.addDevice();
-        res.redirect('/devices');
-    }catch (err) {
-        console.error('Error adding a device: ', err.message);
-        res.status(500).json({error: 'Failed to add a device'});
-    }
+    const selectQuery = "SELECT * FROM user WHERE unsername = ?";
+
+    db.query(selectQuery, [username],(req,res)=>{
+        if(err){
+            console.error("Error retrieving the user: ",err);
+            return res.redirect('/login');
+        }
+        if(result.lenght === 0){
+            //user was not found in the database
+            return res.redirect('/login');
+        }
+
+        const user = result[0]; // {user: isaac, password: 3614ImB@7250}
+
+        bcrypt.compare(password, user.password,(err,result)=>{
+            if(result){
+                req.session.user = user;
+                res.redirect('/show-devices'); //user already logged in
+            }
+            else{
+                res.redirect('/login');
+            }
+        });
+    });
 });
 
-router.get('/devices/edit/:id', async (req, res) => {
-    const deviceId = req.params.id;
-    try {
-        const device = await Device.getDeviceById(deviceId);
-        res.render('edit-device', {device});
-    }catch (err) {
-        console.error('Error fetching the device: ' + err.message);
-        res.status(500).json({error: 'Failed to fetch the device'});
-    }
-});
+router.post('/logout',(req,res)=>{
+    const {username,password} = req.body;
 
-router.post('/devices/update/:id', async (req, res) => {
-    const deviceId = req.params.id;
-    const {id, device_name, brand, price} = req.body;
-    const updatedDevice = new Device(id, device_name, brand, price);
-    try {
-        await updatedDevice.updateDevice();
-        res.redirect('/devices');
-    }catch (err) {
-        console.error('Error updating the device: ' + err.message);
-        res.status(500).json({error: 'Failed to update the device'});
-    }
-});
+    const selectQuery = "SELECT * FROM user WHERE unsername = ?";
 
-router.get('/devices/delete/:id', async (req, res) => {
-    const deviceId = req.params.id;
-    try {
-        await Device.deleteDevice(deviceId);
-        res.redirect('/devices');
-    }catch (err) {
-        console.error('Error deleting the device: ' + err.message);
-        res.status(500).json({error: 'Failed to delete the device'});
-    }
+    db.query(selectQuery, [username],(req,res)=>{
+        if(err){
+            console.error("Error retrieving the user: ",err);
+            return res.redirect('/logout');
+        }
+        if(result.lenght === 0){
+            //user was not found in the database
+            return res.redirect('/logout');
+        }
+
+        const user = result[0];
+
+        bcrypt.compare(password, user.password,(err,result)=>{
+            if(result){
+                req.session.user = user;
+                res.redirect('/show-devices');
+            }
+            else{
+                res.redirect('/logout');
+            }
+        });
+    });
 });
 
 module.exports = router;
